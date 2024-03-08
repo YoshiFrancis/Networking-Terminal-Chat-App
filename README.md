@@ -7,3 +7,4 @@ projects to practice
 5. blackjack btwn server and client
 6. blackjack btween 3+ people
 7. make a user interface for everything via javascript#
+1
