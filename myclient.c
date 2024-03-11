@@ -98,14 +98,14 @@ void* getServerInput() {
             exit(1);
         }
         buff[numbytes] = '\0';
-        printf("%d\n", numbytes);
+        printf("\nServer: %s", buff);
     }
 }
 
 void* getUserInput() {
     while (1) {
         char msg[MAX_MSG_LEN];
-        printf("Input message: ");
+        printf("=");
         fgets(msg, MAX_MSG_LEN, stdin);
 
         if ((send(sockfd, msg, strlen(msg), 0)) == -1) {

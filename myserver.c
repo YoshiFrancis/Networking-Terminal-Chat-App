@@ -115,7 +115,6 @@ void* getHostInput() {
             perror("server: send\n");
             exit(1);
         }
-        printf("Sending message to client...");
     }
 }
 
@@ -133,6 +132,6 @@ void* getIncommingInput() {
         }
 
         buff[numbytes] = '\0';
-        printf("Client: %s\n", buff);
+        printf("\nClient: %s\n", buff);
     }
 }
