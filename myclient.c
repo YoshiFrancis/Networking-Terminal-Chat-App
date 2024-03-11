@@ -6,8 +6,20 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define MAX_MSG_LEN 100
+
+void* getUserInput();
+void* getServerInput();
+static int sockfd;
+
+/*
+TODO:
+1. make thread for receiving input from server and ready to display
+    - must also be ready to cancel the chance for user to input when recv == 0 indicating a FIN
+2. make thread for user inputting own message
+*/
 
 int main(int argc, char* argv[]) {
     // getaddrinfo
@@ -22,8 +34,8 @@ int main(int argc, char* argv[]) {
     }
 
     struct addrinfo hints, *res, *p;
-    int sockfd, status, numbytes;
-    char buff[MAX_MSG_LEN];
+    int status, numbytes;
+    pthread_t cliInputThread, servOutputThread;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
@@ -54,6 +66,30 @@ int main(int argc, char* argv[]) {
     freeaddrinfo(res);
 
     while(1) {
+        int iret1, iret2;
+        iret1 = pthread_create(&cliInputThread, NULL, getUserInput, NULL);
+        iret2 = pthread_create(&servOutputThread, NULL, getServerInput, NULL);
+
+        printf("Joining threads...\n");
+        pthread_join(cliInputThread, NULL);
+        pthread_join(servOutputThread, NULL);
+
+        printf("Threads have been joined!");
+        
+
+    }
+
+    close(sockfd);
+    
+
+    return 0;
+
+}
+
+void* getServerInput() {
+    while(1) {
+        char buff[MAX_MSG_LEN];
+        int numbytes;
         if ((numbytes = recv(sockfd, buff, MAX_MSG_LEN - 1, 0)) == -1) {
             perror("client: recv\n");
             close(sockfd);
@@ -61,24 +97,19 @@ int main(int argc, char* argv[]) {
         }
         buff[numbytes] = '\0';
         printf("Server: %s\n", buff);
+    }
+}
 
+void* getUserInput() {
+    while (1) {
         char msg[MAX_MSG_LEN];
         printf("Input message: ");
         fgets(msg, MAX_MSG_LEN, stdin);
-        printf("sending message...\n");
+
         if ((send(sockfd, msg, strlen(msg), 0)) == -1) {
             perror("client: send\n");
             close(sockfd);
             exit(1);
         }
     }
-    
-
-    
-    
-
-    close(sockfd);
-
-    return 0;
-
 }

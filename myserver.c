@@ -11,6 +11,13 @@
 #define BACKLOG 10
 #define MAX_MESSAGE_LEN 100
 
+/*
+TODO:
+1. ability to receive input and allow host to input at same time
+    - will utilize threads: 1 for each functionality
+2. functionality to multicast to each user connected to host/server
+*/
+
 void chat(int);
 
 int main(int argc, char* argv[]) {
@@ -86,12 +93,14 @@ void chat(int newfd) {
         char msg[MAX_MESSAGE_LEN];
         printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin);
-        printf("sending message...\n");
+
 
         if ((send(newfd, msg, strlen(msg), 0)) == -1) {
             perror("server: send\n");
             return;
         }
+
+        printf("Sending message to client...");
 
         char buff[MAX_MESSAGE_LEN];
         int numbytes;
