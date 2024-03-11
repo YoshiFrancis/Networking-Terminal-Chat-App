@@ -70,7 +70,6 @@ int main(int argc, char* argv[]) {
         iret1 = pthread_create(&cliInputThread, NULL, getUserInput, NULL);
         iret2 = pthread_create(&servOutputThread, NULL, getServerInput, NULL);
 
-        printf("Joining threads...\n");
         pthread_join(cliInputThread, NULL);
         pthread_join(servOutputThread, NULL);
 
@@ -94,9 +93,12 @@ void* getServerInput() {
             perror("client: recv\n");
             close(sockfd);
             exit(1);
+        } else if (numbytes == 0) {
+            close(sockfd);
+            exit(1);
         }
         buff[numbytes] = '\0';
-        printf("Server: %s\n", buff);
+        printf("%d\n", numbytes);
     }
 }
 
