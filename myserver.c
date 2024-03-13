@@ -12,6 +12,7 @@
 #define BACKLOG 10
 #define MAX_MESSAGE_LEN 100
 #define MAX_USERNAME_LEN 10
+#define MIN_USERNAME_LEN 4
 
 /*
 TODO:
@@ -222,7 +223,8 @@ void* writeToAllClients(void* msg_arg) {
 }
 
 void getClientUsername(Client* client) {
-    char* prompt = "Please enter a username no longer than 9 and no shorter than 4 characters: ";
+    char prompt[100];
+    sprintf(prompt, "Please enter a username no longer than %d and no shorter than %d characters: ", MAX_USERNAME_LEN, MIN_USERNAME_LEN);
     int numbytes = 0;
     while (numbytes >= MAX_USERNAME_LEN || numbytes <= 3) {
         if ((send(client->connfd, prompt, strlen(prompt), 0)) == -1) {
@@ -239,6 +241,15 @@ void getClientUsername(Client* client) {
             return;
         }
     }
+
+    // this is my confirmation send to tell client the username was valid
+    if ((send(client->connfd, "y", 1, 0)) == -1) {
+            perror("server: send\n");
+            close(client->connfd);
+            return;
+            // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
+        }
+
     client->username[numbytes] = '\0';
 }
 

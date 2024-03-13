@@ -12,6 +12,7 @@
 
 void* getUserInput(void*);
 void* getServerInput(void*);
+void promptUsername(int);
 
 /*
 TODO:
@@ -60,7 +61,10 @@ int main(int argc, char* argv[]) {
     }
     freeaddrinfo(res);
 
+    promptUsername(sockfd);
+
     while(1) {
+
         pthread_create(&cliInputThread, NULL, getUserInput, &sockfd);
         pthread_create(&servOutputThread, NULL, getServerInput, &sockfd);
     }
@@ -77,7 +81,7 @@ void* getServerInput(void* sockfd_arg) {
         int numbytes;
         
         if ((numbytes = recv(sockfd, buff, MAX_MSG_LEN - 1, 0)) == -1) {
-            perror("client: recv\n");
+            perror("client: recv - server input\n");
             close(sockfd);
             exit(1);
         } else if (numbytes == 0) {
@@ -99,9 +103,41 @@ void* getUserInput(void* sockfd_arg) {
         fgets(msg, MAX_MSG_LEN, stdin);
 
         if ((send(sockfd, msg, strlen(msg), 0)) == -1) {
-            perror("client: send\n");
+            perror("client: send - user input\n");
             close(sockfd);
             exit(1);
         }
     }
+}
+
+void promptUsername(int sockfd) {
+    char username[MAX_MSG_LEN];
+    while (1) {
+        char buff[MAX_MSG_LEN];
+        int numbytes;
+
+        if ((numbytes = recv(sockfd, &buff, sizeof(buff), 0)) == -1) {
+            perror("client: recv - prompt\n");
+            return;
+        }
+
+        buff[numbytes] = '\0';
+        printf("%s\n", buff); // prompt from the server
+
+        fgets(username, MAX_MSG_LEN, stdin);
+        if ((send(sockfd, username, strlen(username), 0)) == -1) {
+            perror("client: send - prompt\n");
+            return;
+        }
+
+        if ((numbytes = recv(sockfd, &buff, sizeof(buff), 0)) == -1) {
+            perror("client: recv - prompt\n");
+            return;
+        }
+
+        if (buff[0] == 'y')  // means username has not been declined
+            break;
+        
+    }
+    printf("Your username is %s\n", username);
 }
