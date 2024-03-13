@@ -81,10 +81,11 @@ void* getServerInput(void* sockfd_arg) {
         } else if (numbytes == 0) {
             close(sockfd);
             exit(1);
+        } else {
+            buff[numbytes] = '\0';
+            printf("\nServer: %s", buff);
         }
-        buff[numbytes] = '\0';
-        printf("\nServer: %s", buff);
-        printf("Input Message: ");
+        
     }
 }
 

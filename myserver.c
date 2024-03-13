@@ -74,22 +74,25 @@ int main(int argc, char* argv[]) {
     while(1) {
         struct sockaddr_storage client_addr;
         socklen_t client_addr_len = sizeof client_addr;
+        int* newfd_ptr;
         if ((newfd = accept(sockfd, (struct sockaddr*) &client_addr, &client_addr_len)) == -1) {
             perror("server: accept\n");
             continue;
         }
+        if ((newfd_ptr = malloc(sizeof(newfd))) == NULL) {
+            perror("server: malloc\n");
+            close(newfd);
+            continue;
+        } 
+        *newfd_ptr = newfd;
         printf("Successfully accepted new client!\n");
         
         printf("Beginning communications...\n");
         pthread_t incommingClientThreads, hostOutputThread;
 
-        pthread_create(&incommingClientThreads, NULL, getIncommingInput, &newfd);
-        pthread_create(&hostOutputThread, NULL, getHostInput, &newfd);
+        pthread_create(&incommingClientThreads, NULL, getIncommingInput, newfd_ptr);
+        pthread_create(&hostOutputThread, NULL, getHostInput, newfd_ptr);
 
-        pthread_join(incommingClientThreads, NULL);
-        pthread_join(hostOutputThread, NULL);
-
-        close(newfd);
     }
 
     close(sockfd);
@@ -104,6 +107,7 @@ void* getHostInput(void* newfd_arg) {
 
         if ((send(newfd, msg, strlen(msg), 0)) == -1) {
             perror("server: send\n");
+            close(newfd);
             exit(1);
         }
     }
@@ -121,9 +125,10 @@ void* getIncommingInput(void* newfd_arg) {
         } else if (numbytes == 0) {
             printf("Client closed connection...\n");
             exit(1);
+        } else {
+            buff[numbytes] = '\0';
+            pthread_t tid = pthread_self();
+            printf("\nClient %lu: %s", tid, buff);
         }
-
-        buff[numbytes] = '\0';
-        printf("\nClient: %s\n", buff);
     }
 }
