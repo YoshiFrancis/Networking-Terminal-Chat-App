@@ -23,6 +23,7 @@ TODO:
 void* getIncommingInput(void*);
 void beginHostInput();
 void* getHostInput();
+void* writeToAllClients(void*);
 pthread_once_t once = PTHREAD_ONCE_INIT;
 
 typedef struct Client {
@@ -128,6 +129,7 @@ void* getHostInput() {
     while(client_count >= 1) {
         Client* prev_client;
         Client* client;
+        pthread_t writeToAllClientsThread;
         char msg[MAX_MESSAGE_LEN];
         printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin); // the blocking function for this thread
@@ -135,22 +137,13 @@ void* getHostInput() {
         client = head_client;
         prev_client = head_client;
         pthread_mutex_unlock(&head_client_mutex);
-        for (; client != NULL; client = client->next) {
-            int connfd = client->connfd;
-            if ((send(connfd, msg, strlen(msg), 0)) == -1) {
-                perror("server: send\n");
-                pthread_mutex_lock(&head_client_mutex);
-                prev_client = client->next; // removing the client from the list of clients
-                pthread_mutex_unlock(&head_client_mutex);
-                close(connfd);
-            }
-            prev_client = client;
-        }
+        pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, msg);
     }
 }
 
 void* getIncommingInput(void* newfd_arg) {
     while(1) {
+        pthread_t writeToClientsThread;
         int newfd = *((int*) newfd_arg);
         char buff[MAX_MESSAGE_LEN];
         int numbytes;
@@ -171,7 +164,28 @@ void* getIncommingInput(void* newfd_arg) {
             buff[numbytes] = '\0';
             pthread_t tid = pthread_self();
             printf("\nClient %lu: %s", tid, buff);
+            pthread_create(&writeToClientsThread, NULL, writeToAllClients, buff);
         }
     }
 }
 
+void* writeToAllClients(void* msg_arg) {
+    Client* prev_client;
+    Client* client;
+    char* msg = (char*) msg_arg;
+    pthread_mutex_lock(&head_client_mutex);
+    client = head_client;
+    prev_client = head_client;
+    pthread_mutex_unlock(&head_client_mutex);
+    for (; client != NULL; client = client->next) {
+        int connfd = client->connfd;
+        if ((send(connfd, msg, strlen(msg), 0)) == -1) {
+            perror("server: send\n");
+            pthread_mutex_lock(&head_client_mutex);
+            prev_client = client->next; // removing the client from the list of clients
+            pthread_mutex_unlock(&head_client_mutex);
+            close(connfd);
+        }
+        prev_client = client;
+    }
+}
