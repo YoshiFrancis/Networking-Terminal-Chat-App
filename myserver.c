@@ -41,9 +41,7 @@ void getClientUsername(Client*);
 
 typedef struct Message {
     char* msg;
-    char* username;
-    int connfd;
-    // Client* client;
+    Client client;
 } Message;
 
 static Client* head_client;
@@ -135,7 +133,7 @@ int main(int argc, char* argv[]) {
 
         pthread_t incommingClientThreads;
         pthread_once(&once, beginHostInput);
-        pthread_create(&incommingClientThreads, NULL, getIncommingInput, newfd_ptr);
+        pthread_create(&incommingClientThreads, NULL, getIncommingInput, head_client);
         printf("Onto the next...\n");
     }
 
@@ -153,7 +151,8 @@ void* getHostInput() {
         pthread_t writeToAllClientsThread;
         printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin); // the blocking function for this thread
-        Message host_msg = { .connfd = -1, .msg = msg };
+        Client client = { .connfd = -1, .username = "Host" };
+        Message host_msg = { .client = client, .msg = msg };
         pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, (void*) &host_msg);
     }
     printf("No more clients...\n");
@@ -181,7 +180,8 @@ void* getIncommingInput(void* newfd_arg) {
             pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
-            Message client_msg = { .connfd = newfd, .msg = buff };
+            Client client = { .connfd = newfd, .username = "default" };
+            Message client_msg = { .client = client, .msg = buff };
             pthread_create(&writeToClientsThread, NULL, writeToAllClients, (void*) &client_msg);
         }
 
@@ -200,8 +200,10 @@ void* writeToAllClients(void* msg_arg) {
     pthread_mutex_unlock(&head_client_mutex);
     for (; client != NULL; client = client->next) {
         int connfd = client->connfd;
-        if (msg_container.connfd == connfd) 
+        // char* new_msg[MAX_MESSAGE_LEN + MAX_USERNAME_LEN];
+        if (msg_container.client.connfd == connfd) 
             continue;
+
         if ((send(connfd, msg_container.msg, strlen(msg_container.msg), 0)) == -1) {
             perror("server: send\n");
             pthread_mutex_lock(&head_client_mutex);
