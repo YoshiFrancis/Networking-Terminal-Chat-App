@@ -20,15 +20,14 @@ TODO:
 */
 
 
-void* getIncommingInput();
-void* getHostInput();
-static int sockfd, newfd;
+void* getIncommingInput(void*);
+void* getHostInput(void*);
 
 
 int main(int argc, char* argv[]) {
 
     struct addrinfo hints, *res, *p;
-    int status;
+    int status, sockfd, newfd;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
@@ -81,23 +80,14 @@ int main(int argc, char* argv[]) {
         }
         printf("Successfully accepted new client!\n");
         
-        // way to differentiate btwn different forks is the pid
-        if (!fork()) {
-            close(sockfd);
-            printf("Beginning communications...\n");
-            pthread_t incommingClientThreads, hostOutputThread;
-            int iret1, iret2;
-            iret1 = pthread_create(&incommingClientThreads, NULL, getIncommingInput, NULL);
-            iret2 = pthread_create(&hostOutputThread, NULL, getHostInput, NULL);
+        printf("Beginning communications...\n");
+        pthread_t incommingClientThreads, hostOutputThread;
 
+        pthread_create(&incommingClientThreads, NULL, getIncommingInput, &newfd);
+        pthread_create(&hostOutputThread, NULL, getHostInput, &newfd);
 
-            pthread_join(incommingClientThreads, NULL);
-            pthread_join(hostOutputThread, NULL);
-
-            printf("Threads have been joined!\n");
-            close(newfd);
-            exit(0);
-        }
+        pthread_join(incommingClientThreads, NULL);
+        pthread_join(hostOutputThread, NULL);
 
         close(newfd);
     }
@@ -105,8 +95,9 @@ int main(int argc, char* argv[]) {
     close(sockfd);
 }
 
-void* getHostInput() {
+void* getHostInput(void* newfd_arg) {
     while(1) {
+        int newfd = *((int*) newfd_arg);
         char msg[MAX_MESSAGE_LEN];
         printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin);
@@ -118,8 +109,9 @@ void* getHostInput() {
     }
 }
 
-void* getIncommingInput() {
+void* getIncommingInput(void* newfd_arg) {
     while(1) {
+        int newfd = *((int*) newfd_arg);
         char buff[MAX_MESSAGE_LEN];
         int numbytes;
 
