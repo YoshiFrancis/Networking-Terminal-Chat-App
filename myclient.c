@@ -10,9 +10,8 @@
 
 #define MAX_MSG_LEN 100
 
-void* getUserInput();
-void* getServerInput();
-static int sockfd;
+void* getUserInput(void*);
+void* getServerInput(void*);
 
 /*
 TODO:
@@ -22,19 +21,13 @@ TODO:
 */
 
 int main(int argc, char* argv[]) {
-    // getaddrinfo
-    // socket
-    // connect
-    // read/write
-    // close
-
     if (argc != 2) {
-        printf("Usage of the program is to import the target ip address after executable!\n");
-        exit(0);
+        printf("Incorrect usage of the program: input the target ip address after executable!\n");
+        return 0;
     }
 
     struct addrinfo hints, *res, *p;
-    int status, numbytes;
+    int status, numbytes, sockfd;
     pthread_t cliInputThread, servOutputThread;
 
     memset(&hints, 0, sizeof hints);
@@ -66,29 +59,21 @@ int main(int argc, char* argv[]) {
     freeaddrinfo(res);
 
     while(1) {
-        int iret1, iret2;
-        iret1 = pthread_create(&cliInputThread, NULL, getUserInput, NULL);
-        iret2 = pthread_create(&servOutputThread, NULL, getServerInput, NULL);
-
-        pthread_join(cliInputThread, NULL);
-        pthread_join(servOutputThread, NULL);
-
-        printf("Threads have been joined!");
-        
-
+        pthread_create(&cliInputThread, NULL, getUserInput, &sockfd);
+        pthread_create(&servOutputThread, NULL, getServerInput, &sockfd);
     }
-
     close(sockfd);
-    
-
     return 0;
 
 }
 
-void* getServerInput() {
+void* getServerInput(void* sockfd_arg) {
     while(1) {
+        pthread_detach(pthread_self());
+        int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
         char buff[MAX_MSG_LEN];
         int numbytes;
+        
         if ((numbytes = recv(sockfd, buff, MAX_MSG_LEN - 1, 0)) == -1) {
             perror("client: recv\n");
             close(sockfd);
@@ -99,13 +84,15 @@ void* getServerInput() {
         }
         buff[numbytes] = '\0';
         printf("\nServer: %s", buff);
+        printf("Input Message: ");
     }
 }
 
-void* getUserInput() {
+void* getUserInput(void* sockfd_arg) {
     while (1) {
+        pthread_detach(pthread_self());
+        int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
         char msg[MAX_MSG_LEN];
-        printf("=");
         fgets(msg, MAX_MSG_LEN, stdin);
 
         if ((send(sockfd, msg, strlen(msg), 0)) == -1) {
