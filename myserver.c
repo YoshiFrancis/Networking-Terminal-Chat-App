@@ -19,9 +19,9 @@ TODO:
 1. ability to receive input and allow host to input at same time -- DONE
     - will utilize threads: 1 for each functionality
 2. functionality to multicast to each user connected to host/server -- DONE
-3. Get usernames from client via a prompt and name clients to differentiate one from another
+3. Get usernames from client via a prompt and name clients to differentiate one from another -- DONE
 4. make it compatible with Windows and Unix like systems
-5. Need to free the client linked list when done using it
+5. Need to free the client linked list when done using it -- DONE
 */
 
 
@@ -59,7 +59,6 @@ int main(int argc, char* argv[]) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-
 
     if ((status = getaddrinfo(NULL, PORT, &hints, &res) != 0)) {
         perror("server: get addrinfo\n");
@@ -125,7 +124,6 @@ int main(int argc, char* argv[]) {
         // fills in the username member of the new client
 
         printf("Successfully accepted new client! Total clients: %d\n", client_count);
-        printf("Beginning communications...\n");
 
         getClientUsername(head_client);
         printf("New client: %s\n", head_client->username);
@@ -134,7 +132,6 @@ int main(int argc, char* argv[]) {
         pthread_t incommingClientThreads;
         pthread_once(&once, beginHostInput);
         pthread_create(&incommingClientThreads, NULL, getIncommingInput, head_client);
-        printf("Onto the next...\n");
     }
 
     close(sockfd);
@@ -192,7 +189,7 @@ void* writeToAllClients(void* msg_arg) {
     Message msg_container = *((Message*) msg_arg);
     char new_msg[MAX_MESSAGE_LEN + MAX_USERNAME_LEN];
     sprintf(new_msg, "%s: %s", msg_container.client.username, msg_container.msg); // combining the username and the message into one string to send
-    printf("%s\n", new_msg); // for the host
+    printf("%s", new_msg); // for the host
 
     pthread_mutex_lock(&head_client_mutex);
     client = head_client;
@@ -205,13 +202,17 @@ void* writeToAllClients(void* msg_arg) {
         if (msg_container.client.connfd == connfd) 
             continue;
         if ((send(connfd, new_msg, strlen(new_msg), 0)) == -1) {
-            perror("server: send\n");
+            perror("server: send -- write to all clients\n");
             pthread_mutex_lock(&head_client_mutex);
-            prev_client = client->next; // removing the client from the list of clients
+            prev_client->next = client->next; // removing the client from the list of clients
+            free(client); // free the client
+            client = prev_client;
             pthread_mutex_unlock(&head_client_mutex);
             close(connfd);
+        } else {
+            prev_client = client;
         }
-        prev_client = client;
+        
     }
     pthread_exit(NULL);
 }
@@ -222,12 +223,12 @@ void getClientUsername(Client* client) {
     int numbytes = 0;
     while (numbytes >= MAX_USERNAME_LEN || numbytes <= 3) {
         if ((send(client->connfd, prompt, strlen(prompt), 0)) == -1) {
-            perror("server: send\n");
+            perror("server: send - client username\n");
             return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
         if ((numbytes = recv(client->connfd, client->username, MAX_USERNAME_LEN - 1, 0)) == -1) {
-            perror("server: recv\n");
+            perror("server: recv - client username\n");
             return;
         } else if (numbytes == 0) {
             return;
@@ -235,20 +236,9 @@ void getClientUsername(Client* client) {
     }
     // this is my confirmation send to tell client the username was valid
     if ((send(client->connfd, "y", 1, 0)) == -1) {
-            perror("server: send\n");
+            perror("server: send - client username confirmation\n");
             return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
     client->username[numbytes] = '\0';
 }
-
-// void freeClientMemory(Client* client) {
-//     free(client);
-// }
-
-// void freeClientLinkedList(Client* head) {
-//     Client* list_itr = head;
-//     while (list_itr != NULL) {
-
-//     }
-// }

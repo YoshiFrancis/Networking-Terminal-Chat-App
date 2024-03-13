@@ -86,7 +86,7 @@ void* getServerInput(void* sockfd_arg) {
             pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
-            printf("\n%s\n", buff);
+            printf("%s", buff);
         }
         
     }
@@ -115,7 +115,7 @@ void promptUsername(int sockfd) {
             return;
         }
         buff[numbytes] = '\0';
-        printf("%s\n", buff); // prompt from the server
+        printf("%s", buff); // prompt from the server
 
         fgets(username, MAX_MSG_LEN, stdin);
         if ((send(sockfd, username, strlen(username), 0)) == -1) {
@@ -132,5 +132,5 @@ void promptUsername(int sockfd) {
             break;
         
     }
-    printf("Your username is %s\n", username);
+    printf("Your username is %s", username);
 }
