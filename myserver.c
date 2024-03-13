@@ -21,8 +21,19 @@ TODO:
 
 
 void* getIncommingInput(void*);
-void* getHostInput(void*);
+void getHostInput();
+pthread_once_t once = PTHREAD_ONCE_INIT;
 
+typedef struct Client {
+    int connfd;
+    struct Client* next;
+} Client;
+
+static Client* head_client;
+static int client_count;
+
+pthread_mutex_t head_client_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t client_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char* argv[]) {
 
@@ -85,30 +96,51 @@ int main(int argc, char* argv[]) {
             continue;
         } 
         *newfd_ptr = newfd;
-        printf("Successfully accepted new client!\n");
-        
+        client_count++;
+        if (head_client == NULL) {
+            head_client = malloc(sizeof(Client));
+            head_client->connfd = newfd;
+            head_client->next = NULL;
+        } else {
+            Client* new_client = malloc(sizeof(Client));
+            new_client->connfd = newfd;
+            new_client->next = NULL;
+            head_client->next = new_client;
+        }
+        printf("Successfully accepted new client! Total clients: %d\n", client_count);
         printf("Beginning communications...\n");
-        pthread_t incommingClientThreads, hostOutputThread;
 
+        pthread_t incommingClientThreads;
+        // pthread_once(&once, getHostInput);
         pthread_create(&incommingClientThreads, NULL, getIncommingInput, newfd_ptr);
-        pthread_create(&hostOutputThread, NULL, getHostInput, newfd_ptr);
-
+        printf("Onto the next...\n");
     }
 
     close(sockfd);
 }
 
-void* getHostInput(void* newfd_arg) {
-    while(1) {
-        int newfd = *((int*) newfd_arg);
+void getHostInput() {
+
+    while(client_count >= 1) {
+        Client* prev_client;
+        Client* client;
         char msg[MAX_MESSAGE_LEN];
         printf("Input messagee: ");
-        fgets(msg, MAX_MESSAGE_LEN, stdin);
-
-        if ((send(newfd, msg, strlen(msg), 0)) == -1) {
-            perror("server: send\n");
-            close(newfd);
-            exit(1);
+        fgets(msg, MAX_MESSAGE_LEN, stdin); // the blocking function for this thread
+        pthread_mutex_lock(&head_client_mutex);
+        client = head_client;
+        prev_client = head_client;
+        pthread_mutex_unlock(&head_client_mutex);
+        for (; client != NULL; client = client->next) {
+            int connfd = client->connfd;
+            if ((send(connfd, msg, strlen(msg), 0)) == -1) {
+                perror("server: send\n");
+                pthread_mutex_lock(&head_client_mutex);
+                prev_client = client->next; // removing the client from the list of clients
+                pthread_mutex_unlock(&head_client_mutex);
+                close(connfd);
+            }
+            prev_client = client;
         }
     }
 }
@@ -121,9 +153,15 @@ void* getIncommingInput(void* newfd_arg) {
 
         if ((numbytes = recv(newfd, &buff, MAX_MESSAGE_LEN - 1, 0)) == -1) {
             perror("server: recv\n");
+            pthread_mutex_lock(&client_count_mutex);
+            client_count--;
+            pthread_mutex_unlock(&client_count_mutex);
             exit(1);
         } else if (numbytes == 0) {
             printf("Client closed connection...\n");
+            pthread_mutex_lock(&client_count_mutex);
+            client_count--;
+            pthread_mutex_unlock(&client_count_mutex);
             exit(1);
         } else {
             buff[numbytes] = '\0';
