@@ -15,9 +15,11 @@ void* getServerInput(void*);
 
 /*
 TODO:
-1. make thread for receiving input from server and ready to display
+1. make thread for receiving input from server and ready to display -- DONE
     - must also be ready to cancel the chance for user to input when recv == 0 indicating a FIN
-2. make thread for user inputting own message
+2. make thread for user inputting own message -- DONE
+3. Make functionality to send username when prompted (might just be all work on the server side)
+4. Make compatible with Windows and Unix like systems
 */
 
 int main(int argc, char* argv[]) {
