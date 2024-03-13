@@ -148,32 +148,25 @@ void beginHostInput() {
 
 void* getHostInput() {
     pthread_detach(pthread_self());
+    char msg[MAX_MESSAGE_LEN];
     while(client_count >= 1) {
-        Client* prev_client;
-        Client* client;
         pthread_t writeToAllClientsThread;
-        char msg[MAX_MESSAGE_LEN];
         printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin); // the blocking function for this thread
-        pthread_mutex_lock(&head_client_mutex);
-        client = head_client;
-        prev_client = head_client;
-        pthread_mutex_unlock(&head_client_mutex);
         Message host_msg = { .connfd = -1, .msg = msg };
         pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, (void*) &host_msg);
     }
     printf("No more clients...\n");
-    exit(1);
+    pthread_exit(NULL);
 }
 
 void* getIncommingInput(void* newfd_arg) {
     pthread_detach(pthread_self());
+    int newfd = *((int*) newfd_arg);
+    char buff[MAX_MESSAGE_LEN];
+    int numbytes;
     while(1) {
         pthread_t writeToClientsThread;
-        int newfd = *((int*) newfd_arg);
-        char buff[MAX_MESSAGE_LEN];
-        int numbytes;
-
         if ((numbytes = recv(newfd, &buff, MAX_MESSAGE_LEN - 1, 0)) == -1) {
             perror("server: recv\n");
             pthread_mutex_lock(&client_count_mutex);
@@ -191,6 +184,8 @@ void* getIncommingInput(void* newfd_arg) {
             Message client_msg = { .connfd = newfd, .msg = buff };
             pthread_create(&writeToClientsThread, NULL, writeToAllClients, (void*) &client_msg);
         }
+
+        printf("%s\n", buff);
     }
 }
 
@@ -198,7 +193,6 @@ void* writeToAllClients(void* msg_arg) {
     pthread_detach(pthread_self());
     Client* prev_client;
     Client* client;
-
     Message msg_container = *((Message*) msg_arg);
     pthread_mutex_lock(&head_client_mutex);
     client = head_client;

@@ -62,32 +62,28 @@ int main(int argc, char* argv[]) {
     freeaddrinfo(res);
 
     promptUsername(sockfd);
-
-    while(1) {
-
-        pthread_create(&cliInputThread, NULL, getUserInput, &sockfd);
-        pthread_create(&servOutputThread, NULL, getServerInput, &sockfd);
-    }
+    pthread_create(&cliInputThread, NULL, getUserInput, &sockfd);
+    pthread_create(&servOutputThread, NULL, getServerInput, &sockfd);
+    
+    pthread_join(servOutputThread, NULL);
     close(sockfd);
     return 0;
 
 }
 
 void* getServerInput(void* sockfd_arg) {
-    pthread_detach(pthread_self());
     int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
-
+    char buff[MAX_MSG_LEN];
+    int numbytes;
     while(1) {
-        char buff[MAX_MSG_LEN];
-        int numbytes;
-        
         if ((numbytes = recv(sockfd, buff, MAX_MSG_LEN - 1, 0)) == -1) {
             perror("client: recv - server input\n");
             close(sockfd);
-            exit(1);
+            pthread_exit(NULL);
         } else if (numbytes == 0) {
+            printf("Server closed connection...\n");
             close(sockfd);
-            exit(1);
+            pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
             printf("\nServer: %s", buff);
@@ -97,31 +93,27 @@ void* getServerInput(void* sockfd_arg) {
 }
 
 void* getUserInput(void* sockfd_arg) {
+    int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
+    char msg[MAX_MSG_LEN];
     while (1) {
-        pthread_detach(pthread_self());
-        int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
-        char msg[MAX_MSG_LEN];
         fgets(msg, MAX_MSG_LEN, stdin);
-
         if ((send(sockfd, msg, strlen(msg), 0)) == -1) {
             perror("client: send - user input\n");
             close(sockfd);
-            exit(1);
+            pthread_exit(NULL);
         }
     }
 }
 
 void promptUsername(int sockfd) {
     char username[MAX_MSG_LEN];
+    char buff[MAX_MSG_LEN];
+    int numbytes;
     while (1) {
-        char buff[MAX_MSG_LEN];
-        int numbytes;
-
         if ((numbytes = recv(sockfd, &buff, sizeof(buff), 0)) == -1) {
             perror("client: recv - prompt\n");
             return;
         }
-
         buff[numbytes] = '\0';
         printf("%s\n", buff); // prompt from the server
 
