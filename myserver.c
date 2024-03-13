@@ -20,6 +20,7 @@ TODO:
 2. functionality to multicast to each user connected to host/server -- DONE
 3. Get usernames from client via a prompt and name clients to differentiate one from another
 4. make it compatible with Windows and Unix like systems
+5. Need to free the client linked list when done using it
 */
 
 
@@ -27,14 +28,15 @@ void* getIncommingInput(void*);
 void beginHostInput();
 void* getHostInput();
 void* writeToAllClients(void*);
-char* getClientUsername(Client*);
 pthread_once_t once = PTHREAD_ONCE_INIT;
 
 typedef struct Client {
     int connfd;
-    char* username;
+    char username[MAX_USERNAME_LEN];
     struct Client* next;
 } Client;
+
+void getClientUsername(Client*);
 
 typedef struct Message {
     char* msg;
@@ -115,16 +117,19 @@ int main(int argc, char* argv[]) {
             head_client = malloc(sizeof(Client));
             head_client->connfd = newfd;
             head_client->next = NULL;
-            head_client->username = getClientUsername(head_client);
         } else {
             Client* new_client = malloc(sizeof(Client));
             new_client->connfd = newfd;
             new_client->next = head_client;
-            new_client->username = getClientUsername(new_client);
             head_client = new_client;
         }
+        // fills in the username member of the new client
+
         printf("Successfully accepted new client! Total clients: %d\n", client_count);
         printf("Beginning communications...\n");
+
+        getClientUsername(head_client);
+        printf("New client: %s\n", head_client->username);
 
 
         pthread_t incommingClientThreads;
@@ -156,6 +161,8 @@ void* getHostInput() {
         Message host_msg = { .connfd = -1, .msg = msg };
         pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, (void*) &host_msg);
     }
+    printf("No more clients...\n");
+    exit(1);
 }
 
 void* getIncommingInput(void* newfd_arg) {
@@ -211,37 +218,37 @@ void* writeToAllClients(void* msg_arg) {
         }
         prev_client = client;
     }
+    exit(1);
 }
 
-char* getClientUsername(Client* client) {
+void getClientUsername(Client* client) {
     char* prompt = "Please enter a username no longer than 9 and no shorter than 4 characters: ";
-    char* username;
-    int numbytes;
-    do {
+    int numbytes = 0;
+    while (numbytes >= MAX_USERNAME_LEN || numbytes <= 3) {
         if ((send(client->connfd, prompt, strlen(prompt), 0)) == -1) {
             perror("server: send\n");
             close(client->connfd);
-            username = "default";
+            return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
-        if ((numbytes = (client->connfd, &username, MAX_USERNAME_LEN - 1, 0)) == -1) {
+        if ((numbytes = recv(client->connfd, client->username, MAX_USERNAME_LEN - 1, 0)) == -1) {
             perror("server: recv\n");
             close(client->connfd);
-            username = "default";
+            return;
+        } else if (numbytes == 0) {
+            return;
         }
-    } while (numbytes <= MAX_USERNAME_LEN && numbytes > 3);
-    username[numbytes] = '\0';
-    return username;
-    
-}
-
-void freeClientMemory(Client* client) {
-    free(client);
-}
-
-void freeClientLinkedList(Client* head) {
-    Client* list_itr = head;
-    while (list_itr != NULL) {
-        
     }
+    client->username[numbytes] = '\0';
 }
+
+// void freeClientMemory(Client* client) {
+//     free(client);
+// }
+
+// void freeClientLinkedList(Client* head) {
+//     Client* list_itr = head;
+//     while (list_itr != NULL) {
+
+//     }
+// }
