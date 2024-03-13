@@ -21,7 +21,8 @@ TODO:
 
 
 void* getIncommingInput(void*);
-void getHostInput();
+void beginHostInput();
+void* getHostInput();
 pthread_once_t once = PTHREAD_ONCE_INIT;
 
 typedef struct Client {
@@ -111,16 +112,19 @@ int main(int argc, char* argv[]) {
         printf("Beginning communications...\n");
 
         pthread_t incommingClientThreads;
-        // pthread_once(&once, getHostInput);
+        pthread_once(&once, beginHostInput);
         pthread_create(&incommingClientThreads, NULL, getIncommingInput, newfd_ptr);
         printf("Onto the next...\n");
     }
 
     close(sockfd);
 }
+void beginHostInput() {
+    pthread_t hostInputThread;
+    pthread_create(&hostInputThread, NULL, getHostInput, NULL);
+}
 
-void getHostInput() {
-
+void* getHostInput() {
     while(client_count >= 1) {
         Client* prev_client;
         Client* client;
