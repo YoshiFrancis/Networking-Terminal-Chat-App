@@ -86,7 +86,7 @@ void* getServerInput(void* sockfd_arg) {
             pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
-            printf("\nServer: %s", buff);
+            printf("\n%s\n", buff);
         }
         
     }

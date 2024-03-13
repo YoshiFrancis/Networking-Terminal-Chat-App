@@ -149,7 +149,6 @@ void* getHostInput() {
     char msg[MAX_MESSAGE_LEN];
     while(client_count >= 1) {
         pthread_t writeToAllClientsThread;
-        printf("Input messagee: ");
         fgets(msg, MAX_MESSAGE_LEN, stdin); // the blocking function for this thread
         Client client = { .connfd = -1, .username = "Host" };
         Message host_msg = { .client = client, .msg = msg };
@@ -159,14 +158,14 @@ void* getHostInput() {
     pthread_exit(NULL);
 }
 
-void* getIncommingInput(void* newfd_arg) {
+void* getIncommingInput(void* client_arg) {
     pthread_detach(pthread_self());
-    int newfd = *((int*) newfd_arg);
+    Client client = *((Client*) client_arg);
     char buff[MAX_MESSAGE_LEN];
     int numbytes;
     while(1) {
         pthread_t writeToClientsThread;
-        if ((numbytes = recv(newfd, &buff, MAX_MESSAGE_LEN - 1, 0)) == -1) {
+        if ((numbytes = recv(client.connfd, &buff, MAX_MESSAGE_LEN - 1, 0)) == -1) {
             perror("server: recv\n");
             pthread_mutex_lock(&client_count_mutex);
             client_count--;
@@ -180,12 +179,9 @@ void* getIncommingInput(void* newfd_arg) {
             pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
-            Client client = { .connfd = newfd, .username = "default" };
             Message client_msg = { .client = client, .msg = buff };
             pthread_create(&writeToClientsThread, NULL, writeToAllClients, (void*) &client_msg);
         }
-
-        printf("%s\n", buff);
     }
 }
 
@@ -194,17 +190,21 @@ void* writeToAllClients(void* msg_arg) {
     Client* prev_client;
     Client* client;
     Message msg_container = *((Message*) msg_arg);
+    char new_msg[MAX_MESSAGE_LEN + MAX_USERNAME_LEN];
+    sprintf(new_msg, "%s: %s", msg_container.client.username, msg_container.msg); // combining the username and the message into one string to send
+    printf("%s\n", new_msg); // for the host
+
     pthread_mutex_lock(&head_client_mutex);
     client = head_client;
     prev_client = head_client;
     pthread_mutex_unlock(&head_client_mutex);
+
+    // looping the the linked list of clients
     for (; client != NULL; client = client->next) {
         int connfd = client->connfd;
-        // char* new_msg[MAX_MESSAGE_LEN + MAX_USERNAME_LEN];
         if (msg_container.client.connfd == connfd) 
             continue;
-
-        if ((send(connfd, msg_container.msg, strlen(msg_container.msg), 0)) == -1) {
+        if ((send(connfd, new_msg, strlen(new_msg), 0)) == -1) {
             perror("server: send\n");
             pthread_mutex_lock(&head_client_mutex);
             prev_client = client->next; // removing the client from the list of clients
@@ -233,14 +233,12 @@ void getClientUsername(Client* client) {
             return;
         }
     }
-
     // this is my confirmation send to tell client the username was valid
     if ((send(client->connfd, "y", 1, 0)) == -1) {
             perror("server: send\n");
             return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
-
     client->username[numbytes] = '\0';
 }
 
