@@ -74,9 +74,10 @@ int main(int argc, char* argv[]) {
 }
 
 void* getServerInput(void* sockfd_arg) {
+    pthread_detach(pthread_self());
+    int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
+
     while(1) {
-        pthread_detach(pthread_self());
-        int sockfd = *((int*)(sockfd_arg)); // giving thread own copy to file descriptor sockfd
         char buff[MAX_MSG_LEN];
         int numbytes;
         

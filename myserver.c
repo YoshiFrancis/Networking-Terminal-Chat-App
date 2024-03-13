@@ -179,17 +179,15 @@ void* getIncommingInput(void* newfd_arg) {
             pthread_mutex_lock(&client_count_mutex);
             client_count--;
             pthread_mutex_unlock(&client_count_mutex);
-            exit(1);
+            pthread_exit(NULL);
         } else if (numbytes == 0) {
             printf("Client closed connection...\n");
             pthread_mutex_lock(&client_count_mutex);
             client_count--;
             pthread_mutex_unlock(&client_count_mutex);
-            exit(1);
+            pthread_exit(NULL);
         } else {
             buff[numbytes] = '\0';
-            pthread_t tid = pthread_self();
-            printf("\nClient %lu: %s", tid, buff);
             Message client_msg = { .connfd = newfd, .msg = buff };
             pthread_create(&writeToClientsThread, NULL, writeToAllClients, (void*) &client_msg);
         }
@@ -219,7 +217,7 @@ void* writeToAllClients(void* msg_arg) {
         }
         prev_client = client;
     }
-    exit(1);
+    pthread_exit(NULL);
 }
 
 void getClientUsername(Client* client) {
@@ -229,13 +227,11 @@ void getClientUsername(Client* client) {
     while (numbytes >= MAX_USERNAME_LEN || numbytes <= 3) {
         if ((send(client->connfd, prompt, strlen(prompt), 0)) == -1) {
             perror("server: send\n");
-            close(client->connfd);
             return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
         if ((numbytes = recv(client->connfd, client->username, MAX_USERNAME_LEN - 1, 0)) == -1) {
             perror("server: recv\n");
-            close(client->connfd);
             return;
         } else if (numbytes == 0) {
             return;
@@ -245,7 +241,6 @@ void getClientUsername(Client* client) {
     // this is my confirmation send to tell client the username was valid
     if ((send(client->connfd, "y", 1, 0)) == -1) {
             perror("server: send\n");
-            close(client->connfd);
             return;
             // i will let the writeToAllClients handle the removal of the client from the Linked List of clients
         }
