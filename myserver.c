@@ -31,6 +31,11 @@ typedef struct Client {
     struct Client* next;
 } Client;
 
+typedef struct Message {
+    char* msg;
+    int connfd;
+} Message;
+
 static Client* head_client;
 static int client_count;
 
@@ -126,6 +131,7 @@ void beginHostInput() {
 }
 
 void* getHostInput() {
+    pthread_detach(pthread_self());
     while(client_count >= 1) {
         Client* prev_client;
         Client* client;
@@ -137,11 +143,13 @@ void* getHostInput() {
         client = head_client;
         prev_client = head_client;
         pthread_mutex_unlock(&head_client_mutex);
-        pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, msg);
+        Message host_msg = { .connfd = -1, .msg = msg };
+        pthread_create(&writeToAllClientsThread, NULL, writeToAllClients, (void*) &host_msg);
     }
 }
 
 void* getIncommingInput(void* newfd_arg) {
+    pthread_detach(pthread_self());
     while(1) {
         pthread_t writeToClientsThread;
         int newfd = *((int*) newfd_arg);
@@ -164,22 +172,27 @@ void* getIncommingInput(void* newfd_arg) {
             buff[numbytes] = '\0';
             pthread_t tid = pthread_self();
             printf("\nClient %lu: %s", tid, buff);
-            pthread_create(&writeToClientsThread, NULL, writeToAllClients, buff);
+            Message client_msg = { .connfd = newfd, .msg = buff };
+            pthread_create(&writeToClientsThread, NULL, writeToAllClients, (void*) &client_msg);
         }
     }
 }
 
 void* writeToAllClients(void* msg_arg) {
+    pthread_detach(pthread_self());
     Client* prev_client;
     Client* client;
-    char* msg = (char*) msg_arg;
+
+    Message msg_container = *((Message*) msg_arg);
     pthread_mutex_lock(&head_client_mutex);
     client = head_client;
     prev_client = head_client;
     pthread_mutex_unlock(&head_client_mutex);
     for (; client != NULL; client = client->next) {
         int connfd = client->connfd;
-        if ((send(connfd, msg, strlen(msg), 0)) == -1) {
+        if (msg_container.connfd == connfd) 
+            continue;
+        if ((send(connfd, msg_container.msg, strlen(msg_container.msg), 0)) == -1) {
             perror("server: send\n");
             pthread_mutex_lock(&head_client_mutex);
             prev_client = client->next; // removing the client from the list of clients
